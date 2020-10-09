@@ -1,15 +1,26 @@
+extern crate ctrlc;
 use std::net::{TcpListener, TcpStream};
 use std::io::prelude::*;
 use std::fs;
 use std::thread;
 use std::time::Duration;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use hello_server::ThreadPool;
 
 fn main() {
+    let exit_handle = Arc::new(AtomicBool::new(false));
+    let exit_dup = exit_handle.clone();
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     let pool = ThreadPool::new(4);
 
+    ctrlc::set_handler(move || {
+        exit_dup.store(true, Ordering::SeqCst);
+    }).expect("Error setting ctrc");
+
     for stream in listener.incoming() {
+        if exit_handle.load(Ordering::SeqCst) {
+            break;
+        }
         let stream = stream.unwrap();
 
         pool.execute(|| {
